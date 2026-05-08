@@ -1,7 +1,7 @@
-# SiliconBox Monitor (or just SiliMon)
-SiliconBox Monitor is a powerful analysis tool designed to help you with software analysis. By leveraging the built-in security features of macOS, SiliMon allows you to analyze potentially malicious or problematic binaries by collecting Endpoint Security events, Apple Unified logs, network packets. It also runs static analysis on the sample being analyzed. This should give you a comprehensive overview of the sample's behavior and help understand what it does quicker than reversing the sample.
+# silimon
+silimon is a powerful analysis tool designed to help you with software analysis. By leveraging the built-in security features of macOS, silimon allows you to analyze potentially malicious or problematic binaries by collecting Endpoint Security events, Apple Unified logs, network packets. It also runs static analysis on the sample being analyzed. This should give you a comprehensive overview of the sample's behavior and help understand what it does quicker than reversing the sample.
 
-SiliconBox Monitor was designed to be run in a dedicated physical or virtual malware analysis lab but it's also fine to run it on your host for debugging/analysing regular applications. A bit like Sysmon for macOS.
+silimon was designed to be run in a dedicated physical or virtual malware analysis lab but it's also fine to run it on your host for debugging/analysing regular applications. A bit like Sysmon for macOS.
 
 It's currently built only for ARM-architecture.
 
@@ -13,27 +13,39 @@ It's currently built only for ARM-architecture.
 - **Packet Capture:** Captures network traffic to identify any suspicious outbound connections or data exfiltration attempts. Currently a pcap is produced as well as a JSON file with source-destination IPv4 traffic seen.
 - **Planned Features:** More features are planned for future releases to enhance analysis capabilities.
 
-## Installation
+## Building from Source
 
-To install SiliconMon, fetch the latest release which includes the binary and necessary provisioning profile. You need to remove the quarantine flag from the binary.
+### Prerequisites
+
+Because silimon uses Apple's Endpoint Security framework, it requires a privileged entitlement (`com.apple.developer.endpoint-security.client`) that Apple gates explicitly. Ad-hoc signing is not supported — you must:
+
+1. Have an active [Apple Developer account](https://developer.apple.com)
+2. Request the `com.apple.developer.endpoint-security.client` entitlement from Apple via the [entitlement request form](https://developer.apple.com/contact/request/endpoint-security-app) — approval is required before you can provision it
+3. Once approved, open `silimon.xcodeproj` in Xcode, go to **Signing & Capabilities**, set your development team, and change `PRODUCT_BUNDLE_IDENTIFIER` from `com.developerid.silimon` to your own bundle identifier (e.g. `com.acme.silimon`)
+4. Update the matching entry in `Monitor/EventCollector.swift` — find `com.developerid.silimon` in the `ignoredSigningIds` set and replace it with your bundle identifier, so silimon filters its own events correctly
+
+silimon must also be run as root (`sudo`) since the Endpoint Security framework requires it.
+
+Signed version is also available on request.
 
 ## Usage
 
-SiliMon is a command-line tool that can be used as follows:
+silimon is a command-line tool that can be used as follows:
 
 ```bash
-USAGE: silimon <sample-path> [--timeout <timeout>] [--runmode <runmode>] [--auto-exec-sample] [--debug-output]
+USAGE: silimon <sample-path> [--timeout <timeout>] [--runmode <runmode>] [--interface <interface>] [--output-dir <output-dir>] [--auto-exec-sample] [--debug-output]
 
 ARGUMENTS:
-  <sample-path>           Path to sample
+  <sample-path>                   Path to sample
 
 OPTIONS:
-  -t, --timeout <timeout> Timeout in seconds. (default: 60)
-  -r, --runmode <runmode> Run mode options (e.g., 's - static', 'a - aul collection', 'n - network logs', 'e - esf events', 'sane - all'). (default:
-                          sane)
-  -a, --auto-exec-sample  Enable automatic execution. (default: false)
-  -d, --debug-output      Enable debug output. (default: false)
-  -h, --help              Show help information.
+  -t, --timeout <timeout>         Timeout in seconds. (default: 60)
+  -r, --runmode <runmode>         Run mode options (e.g., 's - static', 'a - aul collection', 'n - network logs', 'e - esf events', 'sane - all'). (default: sane)
+  -i, --interface <interface>     Network interface to capture (e.g., en0). (default: en0)
+  -o, --output-dir <output-dir>   Directory to write result files and the zip archive. (default: /tmp)
+  -a, --auto-exec-sample          Enable automatic execution. (default: false)
+  -d, --debug-output              Enable debug output. (default: false)
+  -h, --help                      Show help information.
 ```
 
 ### Example:
@@ -43,4 +55,4 @@ silimon /System/Applications/Calculator.app/Contents/MacOS/Calculator -t 10 -a -
 
 ### Contact
 
-For any inquiries or issues, feel free to reach out through the project’s GitHub Issues page or send us an email via info@maecer.ee.
+For any inquiries or issues, please use the project’s GitHub Issues page.

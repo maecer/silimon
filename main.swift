@@ -1,0 +1,274 @@
+import Foundation
+import ArgumentParser
+
+final class Atomic<T> {
+    private let queue = DispatchQueue(label: "Atomic Serial Queue")
+    private var _value: T
+
+    init(_ value: T) {
+        self._value = value
+    }
+
+    var value: T {
+        get { return queue.sync { _value } }
+        set { queue.sync { _value = newValue } }
+    }
+}
+
+struct Silimon: ParsableCommand {
+    @Argument(help: "Path to sample")
+    var samplePath: String
+
+    @Option(name: .shortAndLong, help: "Timeout in seconds.")
+    var timeout: Int = 60
+
+    @Option(name: .shortAndLong, help: "Run mode options (e.g., 's - static', 'a - aul collection', 'n - network logs', 'e - esf events', 'sane - all').")
+    var runmode: String = "sane"
+
+    @Option(name: .shortAndLong, help: "Network interface to capture (e.g., en0).")
+    var interface: String = "en0"
+
+    @Option(name: .shortAndLong, help: "Directory to write result files and the zip archive.")
+    var outputDir: String = "/tmp"
+
+    var staticAnalysisEnable: Bool = false
+    var aulCollectionEnable: Bool = false
+    var networkCaptureEnable: Bool = false
+    var esfCollectionEnable: Bool = false
+
+    @Flag(name: .shortAndLong, help: "Enable automatic execution. (default: false)")
+    var autoExecSample: Bool = false
+
+    @Flag(name: .shortAndLong, help: "Enable debug output. (default: false)")
+    var debugOutput: Bool = false
+
+    mutating func run() throws {
+        parseRunMode(runmode)
+        Silimon.mainArguments = (samplePath, timeout, staticAnalysisEnable, aulCollectionEnable, networkCaptureEnable, esfCollectionEnable, debugOutput, autoExecSample, interface, outputDir)
+    }
+
+    mutating func parseRunMode(_ mode: String) {
+        for char in mode {
+            switch char {
+            case "s":
+                staticAnalysisEnable = true
+            case "a":
+                aulCollectionEnable = true
+            case "n":
+                networkCaptureEnable = true
+            case "e":
+                esfCollectionEnable = true
+            default:
+                print("Warning: Unsupported run mode option '\(char)'")
+            }
+        }
+    }
+
+    static var mainArguments: (String, Int, Bool, Bool, Bool, Bool, Bool, Bool, String, String)? = nil
+}
+
+func escapeSingleQuotes(_ s: String) -> String {
+    return s.replacingOccurrences(of: "'", with: "\\'")
+}
+
+func staticAnalysis(_ samplePath: String) -> (String, String) {
+    var staticTriage = StaticResults([samplePath])
+    do {
+        try staticTriage.performStaticAnalysis()
+        return (staticTriage.bundleIdentifier, staticTriage.cdHash)
+    } catch {
+        print("Static analysis failed")
+        return ("", "")
+    }
+}
+
+func startAUL(_ samplePath: String, bundleIdentifier: String = "", stopFlag: Atomic<Bool>, loggingFlag: Atomic<Bool>) {
+    let sampleName = (samplePath as NSString).lastPathComponent
+    var searchTerms = [sampleName]
+    if !bundleIdentifier.isEmpty {
+        searchTerms.append(bundleIdentifier)
+    }
+    DispatchQueue.global().async {
+        var lastSeenDate = Date()
+        while !stopFlag.value {
+            fetchUnifiedLogs(searchTerms: searchTerms, loggingFlag: loggingFlag, lastSeenDate: &lastSeenDate)
+            Thread.sleep(forTimeInterval: 1)
+        }
+    }
+}
+
+func startPacketCapture(_ interface: String, stopFlag: Atomic<Bool>, loggingFlag: Atomic<Bool>, debugOutput: Bool = false) {
+    DispatchQueue.global().async {
+        let capture = PacketCapture(outputFile: logPaths["packet"]!, outputJSON: logPaths["network"]!, loggingFlag: loggingFlag)
+        if debugOutput { print("Started packet capture") }
+        capture.startCapture(interface: interface)
+        while !stopFlag.value {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        capture.stopCapture()
+    }
+}
+
+func execSample(_ samplePath: String) -> Process {
+    let task = Process()
+    task.launchPath = "/usr/bin/open"
+    if samplePath.hasSuffix(".app") {
+        task.arguments = ["-a", samplePath]
+    } else {
+        task.arguments = [samplePath]
+    }
+    task.launch()
+    return task
+}
+
+var logPaths: [String: String] = [:]
+
+func main() {
+    Silimon.main()
+
+    guard let (samplePath, timeout, staticAnalysisFlag, aulCollectionFlag, networkCaptureFlag, esfCollectionFlag, dbgOutput, autoExec, interface, outputDir) = Silimon.mainArguments else {
+        print("Error: Failed to parse command-line arguments.")
+        return
+    }
+
+    let timeoutInterval = TimeInterval(timeout)
+    let stopFlag = Atomic(false)
+    let loggingFlag = Atomic(false)
+    let dispatchGroup = DispatchGroup()
+    let startTimestamp: String = String(Int64(Date().timeIntervalSince1970 * 1000))
+    let sampleName = (samplePath as NSString).lastPathComponent
+    let outputBase = outputDir.hasSuffix("/") ? String(outputDir.dropLast()) : outputDir
+
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: outputBase, isDirectory: &isDirectory) else {
+        print("Error: output directory '\(outputBase)' does not exist.")
+        return
+    }
+    guard isDirectory.boolValue else {
+        print("Error: '\(outputBase)' is not a directory.")
+        return
+    }
+    guard FileManager.default.isWritableFile(atPath: outputBase) else {
+        print("Error: output directory '\(outputBase)' is not writable.")
+        return
+    }
+
+    let logPathGeneric = "\(outputBase)/\(startTimestamp)_\(sampleName)"
+
+    logPaths["sa"] = logPathGeneric + "_sa.json"
+    logPaths["main_esf"] = logPathGeneric + "_main_esf.json"
+    logPaths["extra_esf"] = logPathGeneric + "_extra_esf.json"
+    logPaths["rare_esf"] = logPathGeneric + "_rare_esf.json"
+    logPaths["aul"] = logPathGeneric + "_aul.json"
+    logPaths["network"] = logPathGeneric + "_nw.json"
+    logPaths["packet"] = logPathGeneric + "_packet.pcap"
+
+    var sIds: (String, String) = ("", "")
+    var task: Process? = nil
+
+    if dbgOutput {
+        print("Sample Path: \(samplePath)")
+        print("Timeout: \(timeout)")
+        print("Run Modes:")
+        print("  Static Analysis: \(staticAnalysisFlag)")
+        print("  AUL Collection: \(aulCollectionFlag)")
+        print("  Network Capture: \(networkCaptureFlag)")
+        print("  ESF Collection: \(esfCollectionFlag)")
+        print("  Interface: \(interface)")
+        print("Sample Auto Execution: \(autoExec)")
+        print("Debug Output: \(dbgOutput)")
+    }
+
+    if staticAnalysisFlag {
+        if dbgOutput { print("Running static analysis.") }
+        sIds = staticAnalysis(samplePath)
+        if sIds.0.isEmpty && sIds.1.isEmpty {
+            print("Static analysis limited output.")
+        } else if dbgOutput {
+            print("Static analysis finished.")
+        }
+    }
+
+    if esfCollectionFlag {
+        if dbgOutput { print("Starting event monitor.") }
+        if sIds.1.isEmpty {
+            startRawEventMonitoring(stopFlag: stopFlag, eventSet: 0, dispatchGroup: dispatchGroup)
+            startRawEventMonitoring(stopFlag: stopFlag, eventSet: 1, dispatchGroup: dispatchGroup)
+            startRawEventMonitoring(stopFlag: stopFlag, eventSet: 2, dispatchGroup: dispatchGroup)
+        } else {
+            startRawEventMonitoring(stopFlag: stopFlag, eventSet: 0, dispatchGroup: dispatchGroup, sampleHash: sIds.1)
+            startRawEventMonitoring(stopFlag: stopFlag, eventSet: 1, dispatchGroup: dispatchGroup, sampleHash: sIds.1)
+            startRawEventMonitoring(stopFlag: stopFlag, eventSet: 2, dispatchGroup: dispatchGroup, sampleHash: sIds.1)
+        }
+    }
+
+    if networkCaptureFlag {
+        if dbgOutput { print("Starting packet capture.") }
+        startPacketCapture(interface, stopFlag: stopFlag, loggingFlag: loggingFlag, debugOutput: dbgOutput)
+    }
+
+    if aulCollectionFlag {
+        if dbgOutput { print("Starting AUL logging.") }
+        if !sIds.1.isEmpty {
+            startAUL(samplePath, bundleIdentifier: sIds.0, stopFlag: stopFlag, loggingFlag: loggingFlag)
+        } else {
+            startAUL(samplePath, stopFlag: stopFlag, loggingFlag: loggingFlag)
+        }
+    }
+
+    if (aulCollectionFlag || esfCollectionFlag || networkCaptureFlag || autoExec) {
+        loggingFlag.value = true
+
+        if dbgOutput { print("Logging enabled. Will give a second to start.") }
+        if (aulCollectionFlag || esfCollectionFlag || networkCaptureFlag) {
+            Thread.sleep(forTimeInterval: 1)
+        }
+
+        if autoExec {
+            task = execSample(samplePath)
+            if dbgOutput { print("Trying to exec sample.") }
+        }
+
+        let timeoutDate = Date().addingTimeInterval(timeoutInterval)
+        let adjustedTimeoutForDispatch: TimeInterval = timeoutInterval * 2
+
+        if dbgOutput { print("Starting Logging - timeout starts now. If manual execution, time to start the sample now.") }
+
+        if autoExec && timeout == 0 {
+            while task?.isRunning == true {
+                Thread.sleep(forTimeInterval: 1)
+            }
+        } else {
+            while Date() < timeoutDate {
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+
+        if task?.isRunning == true {
+            if dbgOutput { print("Trying to terminate process.") }
+            task?.terminate()
+        }
+
+        stopFlag.value = true
+
+        if dbgOutput { print("Allow logs to be collected one last time.") }
+        Thread.sleep(forTimeInterval: 5)
+
+        if dbgOutput { print("Waiting for tasks to finish") }
+
+        if dispatchGroup.wait(timeout: DispatchTime.now() + adjustedTimeoutForDispatch) == .timedOut {
+            if dbgOutput { print("Timeout enforced.") }
+        } else {
+            if dbgOutput { print("All tasks finished.") }
+        }
+    }
+
+    if dbgOutput { print("Compressing logs.") }
+
+    let resultPaths = ["sa", "main_esf", "extra_esf", "rare_esf", "aul", "packet", "network"]
+        .compactMap { logPaths[$0] }
+        .filter { FileManager.default.fileExists(atPath: $0) }
+    zipResults(resultPaths: resultPaths, archivePath: "\(outputBase)/\(startTimestamp)_silimon.zip", removeFilesAfterZipping: true)
+}
+
+main()
