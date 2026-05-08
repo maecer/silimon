@@ -109,9 +109,11 @@ struct StaticResults {
             if !output.isEmpty {
                 if tool != .file {
                     appendToJSONFile(toolOutputs: [tool.description: output], logPath: self.logPath)
+                    dbManager?.logStaticAnalysis(key: tool.description, value: output)
                 }
             } else if !errorOutput.isEmpty {
                 appendToJSONFile(toolOutputs: [tool.description: errorOutput], logPath: self.logPath)
+                dbManager?.logStaticAnalysis(key: tool.description, value: errorOutput)
             } else {
                 return
             }
@@ -126,9 +128,11 @@ struct StaticResults {
             case .file:
                 self.fileType = output.components(separatedBy: ":")[1].trimmingCharacters(in: .whitespacesAndNewlines)
                 appendToJSONFile(toolOutputs: ["file": self.fileType], logPath: self.logPath)
+                dbManager?.logStaticAnalysis(key: "file", value: self.fileType)
             case .stat:
                 self.fileSize = output.components(separatedBy: " ")[7]
                 appendToJSONFile(toolOutputs: ["size": self.fileSize], logPath: self.logPath)
+                dbManager?.logStaticAnalysis(key: "size", value: self.fileSize)
             default:
                 break
             }

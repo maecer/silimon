@@ -207,17 +207,6 @@ func main() {
         } else if dbgOutput {
             print("Static analysis finished.")
         }
-        if !sIds.0.isEmpty {
-            dbManager?.logStaticAnalysis(key: "bundle_identifier", value: sIds.0)
-        }
-        if !sIds.1.isEmpty {
-            dbManager?.logStaticAnalysis(key: "cd_hash", value: sIds.1)
-        }
-        if jsonOutputEnabled,
-           let saData = FileManager.default.contents(atPath: logPaths["sa"]!),
-           let saString = String(data: saData, encoding: .utf8) {
-            dbManager?.logStaticAnalysis(key: "full_result", value: saString)
-        }
     }
 
     if esfCollectionFlag {
