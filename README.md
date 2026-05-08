@@ -17,12 +17,7 @@ It's currently built only for ARM-architecture.
 
 ### Prerequisites
 
-Because silimon uses Apple's Endpoint Security framework, it requires a privileged entitlement (`com.apple.developer.endpoint-security.client`) that Apple gates explicitly. Ad-hoc signing is not supported — you must:
-
-1. Have an active [Apple Developer account](https://developer.apple.com)
-2. Request the `com.apple.developer.endpoint-security.client` entitlement from Apple via the [entitlement request form](https://developer.apple.com/contact/request/endpoint-security-app) — approval is required before you can provision it
-3. Once approved, open `silimon.xcodeproj` in Xcode, go to **Signing & Capabilities**, set your development team, and change `PRODUCT_BUNDLE_IDENTIFIER` from `com.developerid.silimon` to your own bundle identifier (e.g. `com.acme.silimon`)
-4. Update the matching entry in `Monitor/EventCollector.swift` — find `com.developerid.silimon` in the `ignoredSigningIds` set and replace it with your bundle identifier, so silimon filters its own events correctly
+Because silimon uses Apple's Endpoint Security framework, it requires a privileged entitlement (`com.apple.developer.endpoint-security.client`) that Apple gates explicitly. Ad-hoc signing is not supported — you must have an active [Apple Developer account](https://developer.apple.com).
 
 silimon must also be run as root (`sudo`) since the Endpoint Security framework requires it.
 
