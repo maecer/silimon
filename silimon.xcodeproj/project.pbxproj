@@ -19,6 +19,8 @@
 		AA030000000000000000000C /* libEndpointSecurity.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AA020000000000000000000C /* libEndpointSecurity.tbd */; };
 		AA030000000000000000000D /* libEndpointSecuritySystem.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AA020000000000000000000D /* libEndpointSecuritySystem.tbd */; };
 		AA0300000000000000000010 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = AA0600000000000000000002 /* ArgumentParser */; };
+		AA0300000000000000000008 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000011 /* libsqlite3.tbd */; };
+		AA0300000000000000000009 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000012 /* DatabaseManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -50,6 +52,9 @@
 		AA020000000000000000000D /* libEndpointSecuritySystem.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libEndpointSecuritySystem.tbd; path = usr/lib/libEndpointSecuritySystem.tbd; sourceTree = SDKROOT; };
 		AA020000000000000000000E /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		AA020000000000000000000F /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
+		AA0200000000000000000010 /* LocalConfig.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = LocalConfig.xcconfig; sourceTree = "<group>"; };
+		AA0200000000000000000011 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		AA0200000000000000000012 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +67,7 @@
 				AA030000000000000000000B /* libpcap.tbd in Frameworks */,
 				AA030000000000000000000C /* libEndpointSecurity.tbd in Frameworks */,
 				AA030000000000000000000D /* libEndpointSecuritySystem.tbd in Frameworks */,
+				AA0300000000000000000008 /* libsqlite3.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,6 +100,7 @@
 				AA020000000000000000000D /* libEndpointSecuritySystem.tbd */,
 				AA020000000000000000000E /* Security.framework */,
 				AA020000000000000000000F /* CoreServices.framework */,
+				AA0200000000000000000011 /* libsqlite3.tbd */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -106,6 +113,7 @@
 				AA0100000000000000000005 /* Monitor */,
 				AA0200000000000000000001 /* main.swift */,
 				AA0200000000000000000009 /* silimon-bridging-header.h */,
+				AA0200000000000000000010 /* LocalConfig.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -125,6 +133,7 @@
 				AA0200000000000000000005 /* FileManager.swift */,
 				AA0200000000000000000006 /* StaticAnalysis.swift */,
 				AA0200000000000000000007 /* GenericUtilities.swift */,
+				AA0200000000000000000012 /* DatabaseManager.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -200,6 +209,7 @@
 				AA0300000000000000000005 /* FileManager.swift in Sources */,
 				AA0300000000000000000006 /* StaticAnalysis.swift in Sources */,
 				AA0300000000000000000007 /* GenericUtilities.swift in Sources */,
+				AA0300000000000000000009 /* DatabaseManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -326,16 +336,14 @@
 		};
 		AA0500000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0200000000000000000010 /* LocalConfig.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = silimon.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = "";
 				ENABLE_HARDENED_RUNTIME = NO;
 				EXCLUDED_ARCHS = "";
-				PRODUCT_BUNDLE_IDENTIFIER = com.developerid.silimon;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "silimon-bridging-header.h";
@@ -345,15 +353,13 @@
 		};
 		AA0500000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0200000000000000000010 /* LocalConfig.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = silimon.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = "";
 				ENABLE_HARDENED_RUNTIME = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.developerid.silimon;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "silimon-bridging-header.h";

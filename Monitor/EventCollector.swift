@@ -825,15 +825,25 @@ private func serializeMessage(_ message: UnsafePointer<es_message_t>) -> [String
     return result
 }
 
+private let trackedPIDsLock = NSLock()
+private var trackedPIDs: Set<pid_t> = []
+private var sampleProcessFound = false
+
+private func withPIDsLock<T>(_ block: () -> T) -> T {
+    trackedPIDsLock.lock()
+    defer { trackedPIDsLock.unlock() }
+    return block()
+}
+
 class EventCollector {
     private var client: OpaquePointer?
     private let eventSet: Int
     private let logPath: String
     private let stopFlag: Atomic<Bool>
     private let sampleHash: String
-    private var startLogging: Bool
 
     private var pendingWrites: [String: String] = [:]
+    private var pendingDBRows: [(eventType: String, processPath: String, pid: Int, details: String, timestamp: Int, seqNum: Int)] = []
     private let writeQueue: DispatchQueue
     private static let flushThreshold = 50
 
@@ -860,7 +870,6 @@ class EventCollector {
         self.stopFlag = stopFlag
         self.eventSet = eventSet
         self.sampleHash = sampleHash
-        self.startLogging = sampleHash.isEmpty
         self.writeQueue = DispatchQueue(label: "silimon.write.\(eventSet)")
 
         let eventTypeNames: Set<String>
@@ -903,18 +912,40 @@ class EventCollector {
 
     private func handleEvent(_ message: UnsafePointer<es_message_t>) {
         if shouldFilterEvent(message) { return }
+        guard !stopFlag.value else { return }
 
-        if !startLogging {
-            let process = message.pointee.process.pointee
-            let cdhashHex = withUnsafeBytes(of: process.cdhash) { bytes in
-                bytes.prefix(20).map { String(format: "%02x", $0) }.joined()
+        let pid = audit_token_to_pid(message.pointee.process.pointee.audit_token)
+        let eventType = message.pointee.event_type
+
+        if !sampleHash.isEmpty {
+            let found = withPIDsLock { sampleProcessFound }
+
+            if !found {
+                let cdhashHex = withUnsafeBytes(of: message.pointee.process.pointee.cdhash) { bytes in
+                    bytes.prefix(20).map { String(format: "%02x", $0) }.joined()
+                }
+                guard cdhashHex == sampleHash else { return }
+                withPIDsLock {
+                    sampleProcessFound = true
+                    trackedPIDs.insert(pid)
+                }
             }
-            if cdhashHex == sampleHash {
-                startLogging = true
+
+            if eventType == ES_EVENT_TYPE_NOTIFY_FORK {
+                let parentTracked = withPIDsLock { trackedPIDs.contains(pid) }
+                if parentTracked {
+                    let childPID = audit_token_to_pid(message.pointee.event.fork.child.pointee.audit_token)
+                    withPIDsLock { trackedPIDs.insert(childPID) }
+                }
+            }
+
+            let isTracked = withPIDsLock { trackedPIDs.contains(pid) }
+            guard isTracked else { return }
+
+            if eventType == ES_EVENT_TYPE_NOTIFY_EXIT {
+                withPIDsLock { trackedPIDs.remove(pid) }
             }
         }
-
-        guard startLogging, !stopFlag.value else { return }
 
         guard let eventDict = serializeMessage(message) else { return }
 
@@ -924,12 +955,19 @@ class EventCollector {
         }
 
         let startTime = formatTimeval(message.pointee.process.pointee.start_time)
-        let seqNum = String(message.pointee.global_seq_num)
+        let seqNum = Int(message.pointee.global_seq_num)
         let key = "\(startTime)_\(seqNum)"
+
+        let dbEventType = eventDict["event_type"] as? String ?? ""
+        let dbProcess = eventDict["process"] as? [String: Any]
+        let dbProcessPath = dbProcess?["executable_path"] as? String ?? ""
+        let dbPid = dbProcess?["pid"] as? Int ?? 0
+        let dbTimestamp = Int(eventDict["timestamp"] as? String ?? "0") ?? 0
 
         writeQueue.async { [weak self] in
             guard let self = self else { return }
             self.pendingWrites[key] = jsonString
+            self.pendingDBRows.append((eventType: dbEventType, processPath: dbProcessPath, pid: dbPid, details: jsonString, timestamp: dbTimestamp, seqNum: seqNum))
             if self.pendingWrites.count >= EventCollector.flushThreshold {
                 self.flush()
             }
@@ -940,6 +978,8 @@ class EventCollector {
         guard !pendingWrites.isEmpty else { return }
         appendToJSONFile(toolOutputs: pendingWrites, logPath: logPath)
         pendingWrites.removeAll()
+        dbManager?.logESFEvents(pendingDBRows)
+        pendingDBRows.removeAll()
     }
 
     private func shouldFilterEvent(_ message: UnsafePointer<es_message_t>) -> Bool {

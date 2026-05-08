@@ -28,6 +28,12 @@ func fetchUnifiedLogs(searchTerms: [String], loggingFlag: Atomic<Bool>, lastSeen
                 let key = "\(logEntry.date)_\(messageHash)"
                 let value = "\(logEntry.subsystem): \(logEntry.category) - \(logEntry.composedMessage)"
                 appendToJSONFile(toolOutputs: [key: value], logPath: aulLogPath)
+                dbManager?.logAULEvent(
+                    subsystem: logEntry.subsystem,
+                    category: logEntry.category,
+                    message: logEntry.composedMessage,
+                    timestamp: Int(logEntry.date.timeIntervalSince1970 * 1000)
+                )
 
                 if logEntry.date > latestDate {
                     latestDate = logEntry.date

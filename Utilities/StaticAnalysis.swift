@@ -9,7 +9,7 @@ protocol staticTool {
 }
 
 enum toolArgs: Hashable, CustomStringConvertible {
-    case file, md5, sha256, stat, codesign, otool_shared_libs, codesign_entitlements
+    case file, md5, sha256, stat, codesign, otool_shared_libs, codesign_entitlements, nm_imports
 
     var description: String {
         switch self {
@@ -20,6 +20,7 @@ enum toolArgs: Hashable, CustomStringConvertible {
         case .codesign: return "codesign"
         case .otool_shared_libs: return "otool_shared_libs"
         case .codesign_entitlements: return "codesign_entitlements"
+        case .nm_imports: return "nm_imports"
         }
     }
 
@@ -29,6 +30,7 @@ enum toolArgs: Hashable, CustomStringConvertible {
         case .codesign: return ["-dvvv"]
         case .otool_shared_libs: return ["-L"]
         case .codesign_entitlements: return ["-d", "--entitlements", "-"]
+        case .nm_imports: return ["-u"]
         default: return []
         }
     }
@@ -40,10 +42,10 @@ struct StaticResults {
     let localTooling: [toolArgs: String] = [
         .md5: "md5", .sha256: "shasum", .stat: "stat",
         .codesign: "codesign", .otool_shared_libs: "otool",
-        .codesign_entitlements: "codesign"
+        .codesign_entitlements: "codesign", .nm_imports: "nm"
     ]
     // var customTooling: [String: String]?
-    let nonDirectoryTooling: [String] = ["md5", "shasum", "otool"]
+    let nonDirectoryTooling: [String] = ["md5", "shasum", "otool", "nm"]
     var sha256 = "", bundleIdentifier = "", cdHash = "", fileType = "", fileSize = ""
 
     init(_ sample: [String]) {

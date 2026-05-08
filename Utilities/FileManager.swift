@@ -34,6 +34,7 @@ func zipResults(resultPaths: [String], archivePath: String, removeFilesAfterZipp
 }
 
 func appendToJSONFile(toolOutputs: [String: String], logPath: String) {
+    guard jsonOutputEnabled else { return }
     var existingData: [String: String] = [:]
 
     if let data = FileManager.default.contents(atPath: logPath) {

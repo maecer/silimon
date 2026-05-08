@@ -1,0 +1,5 @@
+// Copy this file to LocalConfig.xcconfig and fill in your Apple Developer credentials.
+// LocalConfig.xcconfig is gitignored and will not be committed.
+
+DEVELOPMENT_TEAM = YOURTEAMID
+PRODUCT_BUNDLE_IDENTIFIER = com.yourdomain.silimon

@@ -13,3 +13,6 @@ build/
 
 # Archives
 *.zip
+
+# Developer credentials — copy LocalConfig.xcconfig.example to LocalConfig.xcconfig and fill in your values
+LocalConfig.xcconfig

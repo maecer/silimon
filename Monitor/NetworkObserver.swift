@@ -9,6 +9,7 @@ class PacketCapture {
     let loggingFlag: Atomic<Bool>
 
     private var pendingWrites: [String: String] = [:]
+    private var pendingDBRows: [(srcIP: String, srcPort: Int, dstIP: String, dstPort: Int, timestamp: Int)] = []
     private let writeQueue = DispatchQueue(label: "silimon.network.write")
     private static let flushThreshold = 50
 
@@ -71,6 +72,8 @@ class PacketCapture {
         guard !pendingWrites.isEmpty else { return }
         appendToJSONFile(toolOutputs: pendingWrites, logPath: outputJSON)
         pendingWrites.removeAll()
+        dbManager?.logNetworkConnections(pendingDBRows)
+        pendingDBRows.removeAll()
     }
 
     func packetHandler(header: UnsafePointer<pcap_pkthdr>?, packet: UnsafePointer<u_char>?) {
@@ -137,9 +140,11 @@ class PacketCapture {
 
                 let uniqueIdentifier = "\(header.pointee.ts.tv_sec)-\(header.pointee.ts.tv_usec)-\(srcIP)-\(dstIP)-\(sourcePort)-\(destinationPort)-\(header.pointee.len)"
                 let entry = srcIP + ":" + String(sourcePort) + "->" + dstIP + ":" + String(destinationPort)
+                let pktTimestamp = Int(header.pointee.ts.tv_sec) * 1000 + Int(header.pointee.ts.tv_usec) / 1000
                 writeQueue.async { [weak self] in
                     guard let self = self else { return }
                     self.pendingWrites[uniqueIdentifier] = entry
+                    self.pendingDBRows.append((srcIP: srcIP, srcPort: Int(sourcePort), dstIP: dstIP, dstPort: Int(destinationPort), timestamp: pktTimestamp))
                     if self.pendingWrites.count >= PacketCapture.flushThreshold {
                         self.flush()
                     }

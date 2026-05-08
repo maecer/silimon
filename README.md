@@ -28,19 +28,20 @@ Signed version is also available on request.
 silimon is a command-line tool that can be used as follows:
 
 ```bash
-USAGE: silimon <sample-path> [--timeout <timeout>] [--runmode <runmode>] [--interface <interface>] [--output-dir <output-dir>] [--auto-exec-sample] [--debug-output]
+USAGE: silimon <sample-path> [--timeout <timeout>] [--runmode <runmode>] [--interface <interface>] [--output-dir <output-dir>] [--output-format <output-format>] [--auto-exec-sample] [--debug-output]
 
 ARGUMENTS:
-  <sample-path>                   Path to sample
+  <sample-path>                            Path to sample
 
 OPTIONS:
-  -t, --timeout <timeout>         Timeout in seconds. (default: 60)
-  -r, --runmode <runmode>         Run mode options (e.g., 's - static', 'a - aul collection', 'n - network logs', 'e - esf events', 'sane - all'). (default: sane)
-  -i, --interface <interface>     Network interface to capture (e.g., en0). (default: en0)
-  -o, --output-dir <output-dir>   Directory to write result files and the zip archive. (default: /tmp)
-  -a, --auto-exec-sample          Enable automatic execution. (default: false)
-  -d, --debug-output              Enable debug output. (default: false)
-  -h, --help                      Show help information.
+  -t, --timeout <timeout>                  Timeout in seconds. (default: 60)
+  -r, --runmode <runmode>                  Run mode options (e.g., 's - static', 'a - aul collection', 'n - network logs', 'e - esf events', 'sane - all'). (default: sane)
+  -i, --interface <interface>              Network interface to capture (e.g., en0). (default: en0)
+  -o, --output-dir <output-dir>            Directory to write result files and the zip archive. (default: /tmp)
+  -f, --output-format <output-format>      Output format ('json', 'sqlite', or 'both'). (default: both)
+  -a, --auto-exec-sample                   Enable automatic execution. (default: false)
+  -d, --debug-output                       Enable debug output. (default: false)
+  -h, --help                               Show help information.
 ```
 
 ### Example:

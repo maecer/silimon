@@ -31,6 +31,9 @@ struct Silimon: ParsableCommand {
     @Option(name: .shortAndLong, help: "Directory to write result files and the zip archive.")
     var outputDir: String = "/tmp"
 
+    @Option(name: [.customShort("f"), .long], help: "Output format ('json', 'sqlite', or 'both').")
+    var outputFormat: String = "both"
+
     var staticAnalysisEnable: Bool = false
     var aulCollectionEnable: Bool = false
     var networkCaptureEnable: Bool = false
@@ -44,7 +47,7 @@ struct Silimon: ParsableCommand {
 
     mutating func run() throws {
         parseRunMode(runmode)
-        Silimon.mainArguments = (samplePath, timeout, staticAnalysisEnable, aulCollectionEnable, networkCaptureEnable, esfCollectionEnable, debugOutput, autoExecSample, interface, outputDir)
+        Silimon.mainArguments = (samplePath, timeout, staticAnalysisEnable, aulCollectionEnable, networkCaptureEnable, esfCollectionEnable, debugOutput, autoExecSample, interface, outputDir, outputFormat)
     }
 
     mutating func parseRunMode(_ mode: String) {
@@ -64,7 +67,7 @@ struct Silimon: ParsableCommand {
         }
     }
 
-    static var mainArguments: (String, Int, Bool, Bool, Bool, Bool, Bool, Bool, String, String)? = nil
+    static var mainArguments: (String, Int, Bool, Bool, Bool, Bool, Bool, Bool, String, String, String)? = nil
 }
 
 func escapeSingleQuotes(_ s: String) -> String {
@@ -122,12 +125,23 @@ func execSample(_ samplePath: String) -> Process {
 }
 
 var logPaths: [String: String] = [:]
+var dbManager: DatabaseManager? = nil
+var jsonOutputEnabled: Bool = true
+var sqliteOutputEnabled: Bool = true
 
 func main() {
     Silimon.main()
 
-    guard let (samplePath, timeout, staticAnalysisFlag, aulCollectionFlag, networkCaptureFlag, esfCollectionFlag, dbgOutput, autoExec, interface, outputDir) = Silimon.mainArguments else {
+    guard let (samplePath, timeout, staticAnalysisFlag, aulCollectionFlag, networkCaptureFlag, esfCollectionFlag, dbgOutput, autoExec, interface, outputDir, outputFormat) = Silimon.mainArguments else {
         print("Error: Failed to parse command-line arguments.")
+        return
+    }
+
+    jsonOutputEnabled = outputFormat == "json" || outputFormat == "both"
+    sqliteOutputEnabled = outputFormat == "sqlite" || outputFormat == "both"
+
+    guard jsonOutputEnabled || sqliteOutputEnabled else {
+        print("Error: Invalid output format '\(outputFormat)'. Use 'json', 'sqlite', or 'both'.")
         return
     }
 
@@ -162,6 +176,11 @@ func main() {
     logPaths["aul"] = logPathGeneric + "_aul.json"
     logPaths["network"] = logPathGeneric + "_nw.json"
     logPaths["packet"] = logPathGeneric + "_packet.pcap"
+    logPaths["sqlite"] = logPathGeneric + "_events.sqlite"
+
+    if sqliteOutputEnabled {
+        dbManager = DatabaseManager(path: logPaths["sqlite"]!)
+    }
 
     var sIds: (String, String) = ("", "")
     var task: Process? = nil
@@ -177,6 +196,7 @@ func main() {
         print("  Interface: \(interface)")
         print("Sample Auto Execution: \(autoExec)")
         print("Debug Output: \(dbgOutput)")
+        print("Output Format: \(outputFormat)")
     }
 
     if staticAnalysisFlag {
@@ -186,6 +206,17 @@ func main() {
             print("Static analysis limited output.")
         } else if dbgOutput {
             print("Static analysis finished.")
+        }
+        if !sIds.0.isEmpty {
+            dbManager?.logStaticAnalysis(key: "bundle_identifier", value: sIds.0)
+        }
+        if !sIds.1.isEmpty {
+            dbManager?.logStaticAnalysis(key: "cd_hash", value: sIds.1)
+        }
+        if jsonOutputEnabled,
+           let saData = FileManager.default.contents(atPath: logPaths["sa"]!),
+           let saString = String(data: saData, encoding: .utf8) {
+            dbManager?.logStaticAnalysis(key: "full_result", value: saString)
         }
     }
 
@@ -265,10 +296,19 @@ func main() {
 
     if dbgOutput { print("Compressing logs.") }
 
-    let resultPaths = ["sa", "main_esf", "extra_esf", "rare_esf", "aul", "packet", "network"]
+    dbManager?.close()
+    dbManager = nil
+
+    let resultPaths = ["sa", "main_esf", "extra_esf", "rare_esf", "aul", "packet", "network", "sqlite"]
         .compactMap { logPaths[$0] }
         .filter { FileManager.default.fileExists(atPath: $0) }
     zipResults(resultPaths: resultPaths, archivePath: "\(outputBase)/\(startTimestamp)_silimon.zip", removeFilesAfterZipping: true)
+
+    if let sqlitePath = logPaths["sqlite"] {
+        for suffix in ["-shm", "-wal"] {
+            try? FileManager.default.removeItem(atPath: sqlitePath + suffix)
+        }
+    }
 }
 
 main()
