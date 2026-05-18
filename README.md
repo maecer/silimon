@@ -21,7 +21,17 @@ Because silimon uses Apple's Endpoint Security framework, it requires a privileg
 
 silimon must also be run as root (`sudo`) since the Endpoint Security framework requires it.
 
-Signed version is also available on request.
+## Installation
+
+You can find a release pkg in https://github.com/maecer/silimon/releases/tag/v1.0.0.
+
+It will install the silimon binary in /usr/local/bin and prompt you to add a provisioning profile SiliconBox CLI to the device.
+
+Due to no notarization, you must follow the below steps for installation:
+* After getting a prompt for "Apple could not verify..."
+* Go to System Settings > Privacy & Security, and scroll down to the Security section near the bottom.
+* You should see a message that signed-silimon.pkg was blocked.
+* Click Open Anyway, authenticated, and then proceed with installation.
 
 ## Usage
 
