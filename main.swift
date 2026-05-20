@@ -16,8 +16,8 @@ final class Atomic<T> {
 }
 
 struct Silimon: ParsableCommand {
-    @Argument(help: "Path to sample")
-    var samplePath: String
+    @Argument(help: "Path to sample (optional; omit to monitor all system activity)")
+    var samplePath: String?
 
     @Option(name: .shortAndLong, help: "Timeout in seconds.")
     var timeout: Int = 60
@@ -67,7 +67,7 @@ struct Silimon: ParsableCommand {
         }
     }
 
-    static var mainArguments: (String, Int, Bool, Bool, Bool, Bool, Bool, Bool, String, String, String)? = nil
+    static var mainArguments: (String?, Int, Bool, Bool, Bool, Bool, Bool, Bool, String, String, String)? = nil
 }
 
 func escapeSingleQuotes(_ s: String) -> String {
@@ -85,11 +85,13 @@ func staticAnalysis(_ samplePath: String) -> (String, String) {
     }
 }
 
-func startAUL(_ samplePath: String, bundleIdentifier: String = "", stopFlag: Atomic<Bool>, loggingFlag: Atomic<Bool>) {
-    let sampleName = (samplePath as NSString).lastPathComponent
-    var searchTerms = [sampleName]
-    if !bundleIdentifier.isEmpty {
-        searchTerms.append(bundleIdentifier)
+func startAUL(_ samplePath: String?, bundleIdentifier: String = "", stopFlag: Atomic<Bool>, loggingFlag: Atomic<Bool>) {
+    var searchTerms: [String] = []
+    if let samplePath = samplePath {
+        searchTerms.append((samplePath as NSString).lastPathComponent)
+        if !bundleIdentifier.isEmpty {
+            searchTerms.append(bundleIdentifier)
+        }
     }
     DispatchQueue.global().async {
         var lastSeenDate = Date()
@@ -150,7 +152,7 @@ func main() {
     let loggingFlag = Atomic(false)
     let dispatchGroup = DispatchGroup()
     let startTimestamp: String = String(Int64(Date().timeIntervalSince1970 * 1000))
-    let sampleName = (samplePath as NSString).lastPathComponent
+    let sampleName = samplePath.map { ($0 as NSString).lastPathComponent } ?? "system"
     let outputBase = outputDir.hasSuffix("/") ? String(outputDir.dropLast()) : outputDir
 
     var isDirectory: ObjCBool = false
@@ -186,7 +188,7 @@ func main() {
     var task: Process? = nil
 
     if dbgOutput {
-        print("Sample Path: \(samplePath)")
+        print("Sample Path: \(samplePath ?? "<none>")")
         print("Timeout: \(timeout)")
         print("Run Modes:")
         print("  Static Analysis: \(staticAnalysisFlag)")
@@ -200,12 +202,16 @@ func main() {
     }
 
     if staticAnalysisFlag {
-        if dbgOutput { print("Running static analysis.") }
-        sIds = staticAnalysis(samplePath)
-        if sIds.0.isEmpty && sIds.1.isEmpty {
-            print("Static analysis limited output.")
-        } else if dbgOutput {
-            print("Static analysis finished.")
+        if let samplePath = samplePath {
+            if dbgOutput { print("Running static analysis.") }
+            sIds = staticAnalysis(samplePath)
+            if sIds.0.isEmpty && sIds.1.isEmpty {
+                print("Static analysis limited output.")
+            } else if dbgOutput {
+                print("Static analysis finished.")
+            }
+        } else {
+            if dbgOutput { print("Skipping static analysis: no sample specified.") }
         }
     }
 
@@ -229,11 +235,8 @@ func main() {
 
     if aulCollectionFlag {
         if dbgOutput { print("Starting AUL logging.") }
-        if !sIds.1.isEmpty {
-            startAUL(samplePath, bundleIdentifier: sIds.0, stopFlag: stopFlag, loggingFlag: loggingFlag)
-        } else {
-            startAUL(samplePath, stopFlag: stopFlag, loggingFlag: loggingFlag)
-        }
+        let bundleId = sIds.1.isEmpty ? "" : sIds.0
+        startAUL(samplePath, bundleIdentifier: bundleId, stopFlag: stopFlag, loggingFlag: loggingFlag)
     }
 
     if (aulCollectionFlag || esfCollectionFlag || networkCaptureFlag || autoExec) {
@@ -245,8 +248,12 @@ func main() {
         }
 
         if autoExec {
-            task = execSample(samplePath)
-            if dbgOutput { print("Trying to exec sample.") }
+            if let samplePath = samplePath {
+                task = execSample(samplePath)
+                if dbgOutput { print("Trying to exec sample.") }
+            } else {
+                if dbgOutput { print("Skipping auto-exec: no sample specified.") }
+            }
         }
 
         let timeoutDate = Date().addingTimeInterval(timeoutInterval)
@@ -254,7 +261,7 @@ func main() {
 
         if dbgOutput { print("Starting Logging - timeout starts now. If manual execution, time to start the sample now.") }
 
-        if autoExec && timeout == 0 {
+        if autoExec && task != nil && timeout == 0 {
             while task?.isRunning == true {
                 Thread.sleep(forTimeInterval: 1)
             }

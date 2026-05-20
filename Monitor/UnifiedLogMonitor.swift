@@ -6,8 +6,9 @@ private let aulLogPath: String = logPaths["aul"]!
 func fetchUnifiedLogs(searchTerms: [String], loggingFlag: Atomic<Bool>, lastSeenDate: inout Date) {
     guard loggingFlag.value else { return }
 
-    let subpredicates = searchTerms.map { NSPredicate(format: "eventMessage CONTAINS %@", $0) }
-    let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: subpredicates)
+    let predicate: NSPredicate? = searchTerms.isEmpty ? nil : NSCompoundPredicate(
+        orPredicateWithSubpredicates: searchTerms.map { NSPredicate(format: "eventMessage CONTAINS %@", $0) }
+    )
 
     guard let logStore = try? OSLogStore(scope: .system) else {
         print("Failed to create log store")

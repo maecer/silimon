@@ -11,6 +11,7 @@ It's currently built only for ARM-architecture.
 - **Apple Unified Logs Collection:** Captures logs from the Unified Logging system for detailed analysis. Currently basic keyword matching but improvements are planned.
 - **Static Analysis:** Runs static analysis on the provided binary to detect potential issues before execution.
 - **Packet Capture:** Captures network traffic to identify any suspicious outbound connections or data exfiltration attempts. Currently a pcap is produced as well as a JSON file with source-destination IPv4 traffic seen.
+- **No-sample mode:** Omit the sample path to monitor all system activity instead of targeting a specific binary.
 - **Planned Features:** More features are planned for future releases to enhance analysis capabilities.
 
 ## Building from Source
@@ -25,7 +26,7 @@ silimon must also be run as root (`sudo`) since the Endpoint Security framework 
 
 You can find a release pkg in https://github.com/maecer/silimon/releases/tag/v1.0.0.
 
-It will install the silimon binary in /usr/local/bin and prompt you to add a provisioning profile SiliconBox CLI to the device.
+It will install the silimon binary in /usr/local/bin and prompt you to add a provisioning profile SiliconBox CLI (also known as silimon) to the device.
 
 Due to no notarization, you must follow the below steps for installation:
 * After getting a prompt for "Apple could not verify..."
@@ -38,10 +39,10 @@ Due to no notarization, you must follow the below steps for installation:
 silimon is a command-line tool that can be used as follows:
 
 ```bash
-USAGE: silimon <sample-path> [--timeout <timeout>] [--runmode <runmode>] [--interface <interface>] [--output-dir <output-dir>] [--output-format <output-format>] [--auto-exec-sample] [--debug-output]
+USAGE: silimon [<sample-path>] [--timeout <timeout>] [--runmode <runmode>] [--interface <interface>] [--output-dir <output-dir>] [--output-format <output-format>] [--auto-exec-sample] [--debug-output]
 
 ARGUMENTS:
-  <sample-path>                            Path to sample
+  <sample-path>                            Path to sample (optional; omit to monitor all system activity)
 
 OPTIONS:
   -t, --timeout <timeout>                  Timeout in seconds. (default: 60)
@@ -54,11 +55,34 @@ OPTIONS:
   -h, --help                               Show help information.
 ```
 
-### Example:
+### Examples
+
+Analyze a specific sample (static analysis + all monitors, auto-execute, 60 s timeout):
 ```bash
-silimon /System/Applications/Calculator.app/Contents/MacOS/Calculator -t 10 -a -d
+sudo silimon /path/to/sample -a
 ```
+
+Analyze an app bundle with a short timeout and debug output:
+```bash
+sudo silimon /System/Applications/Calculator.app/Contents/MacOS/Calculator -t 10 -a -d
+```
+
+Monitor all system activity for 5 minutes (no sample):
+```bash
+sudo silimon -t 300
+```
+
+### No-sample mode
+
+When no `<sample-path>` is provided, silimon switches to system-wide monitoring:
+
+- ESF records every event from every process on the system.
+- AUL collects all Unified Log entries with no keyword filter.
+- Network capture runs as normal.
+- Static analysis and auto-exec are skipped.
+
+> **Warning:** Without a sample target, all three data sources produce output for the entire system simultaneously. On an active machine this generates very large amounts of data very quickly. Use a short timeout, limit the run mode to only the sources you need (e.g. `-r e` for ESF only), and make sure the output directory has sufficient free space before starting.
 
 ### Contact
 
-For any inquiries or issues, please use the project’s GitHub Issues page.
+For any inquiries or issues, please use the project's GitHub Issues page.
