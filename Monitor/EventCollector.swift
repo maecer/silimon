@@ -9,7 +9,7 @@ private let ecEventTypesMain: Set<String> = [
     "cs_invalidated", "deleteextattr",
     "exec", "exit",
     "file_provider_update", "fork",
-    "getextattr", "iokit_open",
+    "gatekeeper_user_override", "getextattr", "iokit_open",
     "login_login", "login_logout",
     "lw_session_login", "lw_session_logout",
     "lw_session_unlock", "mmap",
@@ -18,7 +18,7 @@ private let ecEventTypesMain: Set<String> = [
     "profile_add", "profile_remove",
     "remote_thread_create", "remount",
     "rename", "screensharing_attach",
-    "su", "sudo",
+    "su", "sudo", "tcc_modify",
     "trace", "truncate",
     "xp_malware_detected", "xp_malware_remediated",
     "xpc_connect"
@@ -59,7 +59,8 @@ private let ecEventTypesRare: Set<String> = [
     "od_delete_user", "od_disable_user",
     "od_enable_user", "od_group_add",
     "od_group_remove", "od_group_set",
-    "kextload", "kextunload"
+    "kextload", "kextunload", "settime",
+    "bootstrap_check_in", "bootstrap_look_up"
 ]
 
 let eventNameToType: [String: es_event_type_t] = [
@@ -164,7 +165,63 @@ let eventNameToType: [String: es_event_type_t] = [
     "od_group_set": ES_EVENT_TYPE_NOTIFY_OD_GROUP_SET,
     "kextload": ES_EVENT_TYPE_NOTIFY_KEXTLOAD,
     "kextunload": ES_EVENT_TYPE_NOTIFY_KEXTUNLOAD,
+    "settime": ES_EVENT_TYPE_NOTIFY_SETTIME,
+    "gatekeeper_user_override": ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE,
+    "tcc_modify": ES_EVENT_TYPE_NOTIFY_TCC_MODIFY,
+    "bootstrap_check_in": ES_EVENT_TYPE_NOTIFY_BOOTSTRAP_CHECK_IN,
+    "bootstrap_look_up": ES_EVENT_TYPE_NOTIFY_BOOTSTRAP_LOOK_UP,
 ]
+
+/*
+let authEventNameToType : [String: es_event_type_t] = [
+    "auth_exec" : ES_EVENT_TYPE_AUTH_EXEC,
+    "auth_kextload": ES_EVENT_TYPE_AUTH_KEXTLOAD,
+    "auth_mmap": ES_EVENT_TYPE_AUTH_MMAP,
+    "auth_mprotect": ES_EVENT_TYPE_AUTH_MPROTECT,
+    "auth_mount": ES_EVENT_TYPE_AUTH_MOUNT,
+    "auth_rename": ES_EVENT_TYPE_AUTH_RENAME,
+    "auth_signal": ES_EVENT_TYPE_AUTH_SIGNAL,
+    "auth_unlink": ES_EVENT_TYPE_AUTH_UNLINK,
+    "auth_file_provider_materialize": ES_EVENT_TYPE_AUTH_FILE_PROVIDER_MATERIALIZE,
+    "auth_file_provider_update": ES_EVENT_TYPE_AUTH_FILE_PROVIDER_UPDATE,
+    "auth_readlink": ES_EVENT_TYPE_AUTH_READLINK,
+    "auth_truncate": ES_EVENT_TYPE_AUTH_TRUNCATE,
+    "auth_link": ES_EVENT_TYPE_AUTH_LINK,
+    "auth_create": ES_EVENT_TYPE_AUTH_CREATE,
+    "auth_setattrlist": ES_EVENT_TYPE_AUTH_SETATTRLIST,
+    "auth_setextattr": ES_EVENT_TYPE_AUTH_SETEXTATTR,
+    "auth_setflags": ES_EVENT_TYPE_AUTH_SETFLAGS,
+    "auth_setmode": ES_EVENT_TYPE_AUTH_SETMODE,
+    "auth_setowner": ES_EVENT_TYPE_AUTH_SETOWNER,
+    "auth_chdir": ES_EVENT_TYPE_AUTH_CHDIR,
+    "auth_getattrlist": ES_EVENT_TYPE_AUTH_GETATTRLIST
+    "auth_chroot": ES_EVENT_TYPE_AUTH_CHROOT,
+    "auth_utimes": ES_EVENT_TYPE_AUTH_UTIMES,
+    "auth_clone": ES_EVENT_TYPE_AUTH_CLONE,
+    "auth_getextattr": ES_EVENT_TYPE_AUTH_GETEXTATTR,
+    "auth_listextattr": ES_EVENT_TYPE_AUTH_LISTEXTATTR,
+    "auth_readdir": ES_EVENT_TYPE_AUTH_READDIR,
+    "auth_deleteextattr": ES_EVENT_TYPE_AUTH_DELETEEXTATTR,
+    "auth_fsgetpath": ES_EVENT_TYPE_AUTH_FSGETPATH,
+    "auth_settime": ES_EVENT_TYPE_AUTH_SETTIME,
+    "auth_uipc_bind": ES_EVENT_TYPE_AUTH_UIPC_BIND,
+    "auth_uipc_connect": ES_EVENT_TYPE_AUTH_UIPC_CONNECT,
+    "auth_exchangedata": ES_EVENT_TYPE_AUTH_EXCHANGEDATA,
+    "auth_setacl": ES_EVENT_TYPE_AUTH_SETACL,
+    "auth_proc_check": ES_EVENT_TYPE_AUTH_PROC_CHECK,
+    "auth_get_task": ES_EVENT_TYPE_AUTH_GET_TASK,
+    "auth_searchfs": ES_EVENT_TYPE_AUTH_SEARCHFS,
+    "auth_fcntl": ES_EVENT_TYPE_AUTH_FCNTL,
+    "auth_iokit_open": ES_EVENT_TYPE_AUTH_IOKIT_OPEN,
+    "auth_proc_suspend_resume": ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+    "auth_remount": ES_EVENT_TYPE_AUTH_REMOUNT,
+    "auth_get_task_read": ES_EVENT_TYPE_AUTH_GET_TASK_READ,
+    "auth_copyfile": ES_EVENT_TYPE_AUTH_COPYFILE,
+    "auth_xpc_connect": ES_EVENT_TYPE_AUTH_XPC_CONNECT,
+    "auth_bootstrap_check_in": ES_EVENT_TYPE_AUTH_BOOTSTRAP_CHECK_IN,
+    "auth_bootstrap_look_up": ES_EVENT_TYPE_AUTH_BOOTSTRAP_LOOK_UP
+]
+*/
 
 let eventTypeToName: [es_event_type_t: String] = {
     var reversed: [es_event_type_t: String] = [:]
