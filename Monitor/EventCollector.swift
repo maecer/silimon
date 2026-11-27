@@ -838,22 +838,13 @@ class EventCollector {
     private static let flushThreshold = 50
 
     private let ignoredSigningIds: Set<String> = [
-        "com.apple.BiomeAgent",
-        "com.apple.proactived",
-        "com.apple.xpc.launchd",
-        "com.developerid.silimon", // placeholder
-        "com.apple.mds_stores",
-        "com.apple.ContextStoreAgent",
-        "com.apple.UserEventAgent",
-        "com.apple.STMExtension.Applications",
-        "com.apple.mdworker_shared"
+    ]
+    
+    private let ignoredTeamIds: Set<String> = [
+        //"K736FHD28V"
     ]
 
     private let ignoredPaths: Set<String> = [
-        "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService",
-        "/usr/libexec/logd",
-        "/usr/sbin/cfprefsd",
-        "/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/com.apple.appkit.xpc.openAndSavePanelService.xpc/Contents/MacOS/com.apple.appkit.xpc.openAndSavePanelService"
     ]
 
     init(stopFlag: Atomic<Bool>, eventSet: Int, sampleHash: String = "") {
@@ -967,29 +958,33 @@ class EventCollector {
         let process = message.pointee.process.pointee
         let processPath = String(cString: process.executable.pointee.path.data)
         let signingId = String(cString: process.signing_id.data)
-        let eventType = message.pointee.event_type
+        let teamId: String? = process.team_id.length > 0
+            ? process.team_id.data.map { String(cString: $0) }
+            : nil
+        // let eventType = message.pointee.event_type
 
         if ignoredSigningIds.contains(signingId) { return true }
         if ignoredPaths.contains(processPath) { return true }
+        if let teamId, ignoredTeamIds.contains(teamId) { return true }
 
-        if eventType == ES_EVENT_TYPE_NOTIFY_WRITE {
-            if signingId == "com.apple.syslogd" && processPath.contains("/private/var/log") {
-                return true
-            }
-        }
+        // if eventType == ES_EVENT_TYPE_NOTIFY_WRITE {
+        //     if signingId == "com.apple.syslogd" && processPath.contains("/private/var/log") {
+        //         return true
+        //     }
+        // }
 
-        if signingId == "com.apple.fseventsd" {
-            if eventType == ES_EVENT_TYPE_NOTIFY_LOOKUP ||
-               eventType == ES_EVENT_TYPE_NOTIFY_STAT ||
-               eventType == ES_EVENT_TYPE_NOTIFY_ACCESS {
-                return true
-            }
-        }
+        // if signingId == "com.apple.fseventsd" {
+        //     if eventType == ES_EVENT_TYPE_NOTIFY_LOOKUP ||
+        //        eventType == ES_EVENT_TYPE_NOTIFY_STAT ||
+        //        eventType == ES_EVENT_TYPE_NOTIFY_ACCESS {
+        //         return true
+        //     }
+        // }
 
-        if eventType == ES_EVENT_TYPE_NOTIFY_PROC_CHECK &&
-           processPath.contains("/usr/sbin/distnoted") {
-            return true
-        }
+        // if eventType == ES_EVENT_TYPE_NOTIFY_PROC_CHECK &&
+        //    processPath.contains("/usr/sbin/distnoted") {
+        //     return true
+        // }
 
         return false
     }
