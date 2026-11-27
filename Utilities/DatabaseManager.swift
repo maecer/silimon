@@ -33,6 +33,9 @@ class DatabaseManager {
             """
             CREATE TABLE IF NOT EXISTS aul_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pid INTEGER,
+                process TEXT,
+                sender TEXT,
                 subsystem TEXT,
                 category TEXT,
                 message TEXT,
@@ -90,16 +93,19 @@ class DatabaseManager {
         }
     }
 
-    func logAULEvent(subsystem: String, category: String, message: String, timestamp: Int) {
+    func logAULEvent(pid: Int, process: String, sender: String, subsystem: String, category: String, message: String, timestamp: Int) {
         queue.async { [weak self] in
             guard let self, let db = self.db else { return }
             var stmt: OpaquePointer?
-            let sql = "INSERT INTO aul_events (subsystem, category, message, timestamp) VALUES (?,?,?,?);"
+            let sql = "INSERT INTO aul_events (pid, process, sender, subsystem, category, message, timestamp) VALUES (?,?,?,?,?,?,?);"
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-            sqlite3_bind_text(stmt, 1, subsystem, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(stmt, 2, category, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(stmt, 3, message, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_int64(stmt, 4, Int64(timestamp))
+            sqlite3_bind_int64(stmt, 1, Int64(pid))
+            sqlite3_bind_text(stmt, 2, process, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 3, sender, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 4, subsystem, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 5, category, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 6, message, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int64(stmt, 7, Int64(timestamp))
             sqlite3_step(stmt)
             sqlite3_finalize(stmt)
         }
@@ -145,10 +151,18 @@ class DatabaseManager {
 
     func close() {
         queue.sync {
-            if let db = self.db {
-                sqlite3_close(db)
-                self.db = nil
+            guard let db = self.db else { return }
+            // Built once at the end — cheaper than maintaining indexes during capture.
+            let indexes = [
+                "CREATE INDEX IF NOT EXISTS idx_esf_pid_ts ON esf_events(pid, timestamp);",
+                "CREATE INDEX IF NOT EXISTS idx_esf_type ON esf_events(event_type);",
+                "CREATE INDEX IF NOT EXISTS idx_aul_pid_ts ON aul_events(pid, timestamp);"
+            ]
+            for stmt in indexes {
+                sqlite3_exec(db, stmt, nil, nil, nil)
             }
+            sqlite3_close(db)
+            self.db = nil
         }
     }
 

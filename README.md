@@ -49,7 +49,7 @@ OPTIONS:
   -r, --runmode <runmode>                  Run mode options (e.g., 's - static', 'a - aul collection', 'n - network logs', 'e - esf events', 'sane - all'). (default: sane)
   -i, --interface <interface>              Network interface to capture (e.g., en0). (default: en0)
   -o, --output-dir <output-dir>            Directory to write result files and the zip archive. (default: /tmp)
-  -f, --output-format <output-format>      Output format ('json', 'sqlite', or 'both'). (default: both)
+  -f, --output-format <output-format>      Output format ('sqlite', 'json', or 'both'). JSON is only written when explicitly requested. (default: sqlite)
   -a, --auto-exec-sample                   Enable automatic execution. (default: false)
   -d, --debug-output                       Enable debug output. (default: false)
   -h, --help                               Show help information.
@@ -82,6 +82,8 @@ When no `<sample-path>` is provided, silimon switches to system-wide monitoring:
 - Static analysis and auto-exec are skipped.
 
 > **Warning:** Without a sample target, all three data sources produce output for the entire system simultaneously. On an active machine this generates very large amounts of data very quickly. Use a short timeout, limit the run mode to only the sources you need (e.g. `-r e` for ESF only), and make sure the output directory has sufficient free space before starting.
+>
+> Avoid `-f json` / `-f both` in no-sample mode: the current JSON writer rewrites the whole file on every flush, which can exhaust memory on busy systems and get the process killed. The default SQLite output does not have this problem.
 
 ### Contact
 

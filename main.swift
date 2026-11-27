@@ -31,8 +31,8 @@ struct Silimon: ParsableCommand {
     @Option(name: .shortAndLong, help: "Directory to write result files and the zip archive.")
     var outputDir: String = "/tmp"
 
-    @Option(name: [.customShort("f"), .long], help: "Output format ('json', 'sqlite', or 'both').")
-    var outputFormat: String = "both"
+    @Option(name: [.customShort("f"), .long], help: "Output format ('sqlite', 'json', or 'both'). JSON is only written when explicitly requested.")
+    var outputFormat: String = "sqlite"
 
     var staticAnalysisEnable: Bool = false
     var aulCollectionEnable: Bool = false
@@ -87,6 +87,7 @@ func staticAnalysis(_ samplePath: String) -> (String, String) {
 
 func startAUL(_ samplePath: String?, bundleIdentifier: String = "", stopFlag: Atomic<Bool>, loggingFlag: Atomic<Bool>) {
     var searchTerms: [String] = []
+    let sampleMode = samplePath != nil
     if let samplePath = samplePath {
         searchTerms.append((samplePath as NSString).lastPathComponent)
         if !bundleIdentifier.isEmpty {
@@ -96,7 +97,7 @@ func startAUL(_ samplePath: String?, bundleIdentifier: String = "", stopFlag: At
     DispatchQueue.global().async {
         var lastSeenDate = Date()
         while !stopFlag.value {
-            fetchUnifiedLogs(searchTerms: searchTerms, loggingFlag: loggingFlag, lastSeenDate: &lastSeenDate)
+            fetchUnifiedLogs(searchTerms: searchTerms, sampleMode: sampleMode, loggingFlag: loggingFlag, lastSeenDate: &lastSeenDate)
             Thread.sleep(forTimeInterval: 1)
         }
     }
@@ -143,7 +144,7 @@ func main() {
     sqliteOutputEnabled = outputFormat == "sqlite" || outputFormat == "both"
 
     guard jsonOutputEnabled || sqliteOutputEnabled else {
-        print("Error: Invalid output format '\(outputFormat)'. Use 'json', 'sqlite', or 'both'.")
+        print("Error: Invalid output format '\(outputFormat)'. Use 'sqlite', 'json', or 'both'.")
         return
     }
 

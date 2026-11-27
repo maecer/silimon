@@ -825,16 +825,6 @@ private func serializeMessage(_ message: UnsafePointer<es_message_t>) -> [String
     return result
 }
 
-private let trackedPIDsLock = NSLock()
-private var trackedPIDs: Set<pid_t> = []
-private var sampleProcessFound = false
-
-private func withPIDsLock<T>(_ block: () -> T) -> T {
-    trackedPIDsLock.lock()
-    defer { trackedPIDsLock.unlock() }
-    return block()
-}
-
 class EventCollector {
     private var client: OpaquePointer?
     private let eventSet: Int
@@ -918,32 +908,23 @@ class EventCollector {
         let eventType = message.pointee.event_type
 
         if !sampleHash.isEmpty {
-            let found = withPIDsLock { sampleProcessFound }
-
-            if !found {
+            if !ProcessTracker.sampleFound {
                 let cdhashHex = withUnsafeBytes(of: message.pointee.process.pointee.cdhash) { bytes in
                     bytes.prefix(20).map { String(format: "%02x", $0) }.joined()
                 }
                 guard cdhashHex == sampleHash else { return }
-                withPIDsLock {
-                    sampleProcessFound = true
-                    trackedPIDs.insert(pid)
-                }
+                ProcessTracker.foundSample(pid: pid)
             }
 
-            if eventType == ES_EVENT_TYPE_NOTIFY_FORK {
-                let parentTracked = withPIDsLock { trackedPIDs.contains(pid) }
-                if parentTracked {
-                    let childPID = audit_token_to_pid(message.pointee.event.fork.child.pointee.audit_token)
-                    withPIDsLock { trackedPIDs.insert(childPID) }
-                }
+            if eventType == ES_EVENT_TYPE_NOTIFY_FORK, ProcessTracker.isActive(pid) {
+                let childPID = audit_token_to_pid(message.pointee.event.fork.child.pointee.audit_token)
+                ProcessTracker.track(childPID)
             }
 
-            let isTracked = withPIDsLock { trackedPIDs.contains(pid) }
-            guard isTracked else { return }
+            guard ProcessTracker.isActive(pid) else { return }
 
             if eventType == ES_EVENT_TYPE_NOTIFY_EXIT {
-                withPIDsLock { trackedPIDs.remove(pid) }
+                ProcessTracker.untrack(pid)
             }
         }
 
